@@ -12,6 +12,7 @@ const storage = new CloudinaryStorage({
     params: {
         folder: 'waste-paper',
         allowed_formats: ['jpg', 'jpeg', 'png'],
+        upload_preset: 'waste_unsigned',
         transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
     }
 });
