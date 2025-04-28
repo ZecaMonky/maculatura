@@ -56,7 +56,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Настройка сессий с использованием PostgreSQL
 app.use(session({
     store: new pgSession({
-        conString: process.env.DATABASE_URL
+        conString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
     }),
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
