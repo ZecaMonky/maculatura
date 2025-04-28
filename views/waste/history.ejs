@@ -1,0 +1,44 @@
+<div class="row">
+    <div class="col-12">
+        <h2>История сдачи макулатуры</h2>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Тип макулатуры</th>
+                                <th>Вес (кг)</th>
+                                <th>Фото</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% records.forEach(function(record) { %>
+                                <tr>
+                                    <td><%= new Date(record.date).toLocaleDateString('ru-RU') %></td>
+                                    <td>
+                                        <% if (record.paper_type) { %>
+                                            <%= record.paper_type %>
+                                        <% } else { %>
+                                            <span class="text-muted">[Удалён]</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= record.weight.toFixed(1) %></td>
+                                    <td>
+                                        <% if (record.photo_path) { %>
+                                            <a href="<%= record.photo_path %>" target="_blank">Просмотр</a>
+                                        <% } else { %>
+                                            Нет фото
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 

@@ -1,0 +1,44 @@
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card p-4 shadow-sm border-0 mobbin-auth-card">
+            <div class="text-center mb-4">
+                <div class="mbbin-logo mb-4" style="font-size:2.5rem; font-weight:900; color:#333;"></div>
+                <div class="mb-2" style="font-size:2rem; font-weight:700; letter-spacing:0.01em; color:#222; font-family:'Cakra',sans-serif;">Регистрация</div>
+            </div>
+            <% if (locals.error) { %>
+                <div class="alert alert-danger" role="alert">
+                    <%= error %>
+                </div>
+            <% } %>
+            <form action="/auth/register" method="POST" autocomplete="off">
+                <div class="mb-3">
+                    <input type="text" class="form-control mobbin-input" id="name" name="name" required placeholder="ФИО">
+                </div>
+
+                <div class="mb-3">
+                    <input type="text" class="form-control mobbin-input" id="login" name="login" required placeholder="Логин">
+                    <small class="text-muted d-block mt-1">
+                        Логин должен содержать минимум 4 символа, только латинские буквы, цифры и символ подчеркивания
+                    </small>
+                </div>
+
+                <div class="mb-3">
+                    <input type="password" class="form-control mobbin-input" id="password" name="password" required placeholder="Пароль">
+                    <small class="text-muted d-block mt-1">
+                        Пароль должен содержать минимум 8 символов, включая заглавные и строчные буквы, цифры и специальные символы (!@#$%^&*(),.?":{}|<>_)
+                    </small>
+                </div>
+                <div class="mb-3">
+                    <input type="password" class="form-control mobbin-input" id="confirmPassword" name="confirmPassword" required placeholder="Повторите пароль">
+                </div>
+                <div class="d-grid mb-2">
+                    <button type="submit" class="btn btn-dark mobbin-main-btn">Зарегистрироваться</button>
+                </div>
+            </form>
+            <div class="text-center mt-3">
+                <span class="text-muted" style="font-size:0.95rem;">Уже есть аккаунт?</span>
+                <a href="/auth/login" class="ms-1">Войти</a>
+            </div>
+        </div>
+    </div>
+</div>

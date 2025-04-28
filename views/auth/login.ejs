@@ -1,0 +1,30 @@
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card p-4 shadow-sm border-0 mobbin-auth-card">
+            <div class="text-center mb-4">
+                <div class="mbbin-logo mb-4" style="font-size:2.5rem; font-weight:900; color:#333;"></div>
+                <div class="mb-2" style="font-size:2rem; font-weight:700; letter-spacing:0.01em; color:#222; font-family:'Cakra',sans-serif;">Войти</div>
+            </div>
+            <% if (typeof error !== 'undefined') { %>
+                <div class="alert alert-danger">
+                    <%= error %>
+                </div>
+            <% } %>
+            <form action="/auth/login" method="POST" autocomplete="off">
+                <div class="mb-3">
+                    <input type="text" class="form-control mobbin-input" id="login" name="login" required autofocus placeholder="Логин">
+                </div>
+                <div class="mb-3">
+                    <input type="password" class="form-control mobbin-input" id="password" name="password" required placeholder="Пароль">
+                </div>
+                <div class="d-grid mb-2">
+                    <button type="submit" class="btn btn-dark mobbin-main-btn">Войти</button>
+                </div>
+            </form>
+            <div class="text-center mt-3">
+                <span class="text-muted" style="font-size:0.95rem;">Нет аккаунта?</span>
+                <a href="/auth/register" class="ms-1">Зарегистрироваться</a>
+            </div>
+        </div>
+    </div>
+</div> 

@@ -1,0 +1,100 @@
+<div class="row">
+    <div class="col-12">
+        <h2>Статистика по сдаче макулатуры</h2>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Статистика по месяцам</h4>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="monthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Общая информация</h4>
+                    </div>
+                    <div class="card-body">
+                        <table class="table">
+                            <tbody>
+                                <tr>
+                                    <th>Всего сдано:</th>
+                                    <td><%= stats.reduce((sum, stat) => sum + stat.total_weight, 0).toFixed(1) %> кг</td>
+                                </tr>
+                                <tr>
+                                    <th>Количество месяцев:</th>
+                                    <td><%= stats.length %></td>
+                                </tr>
+                                <tr>
+                                    <th>Среднее за месяц:</th>
+                                    <td>
+                                        <%= (stats.reduce((sum, stat) => sum + stat.total_weight, 0) / (stats.length || 1)).toFixed(1) %> кг
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h4>Детальная статистика по месяцам</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Месяц</th>
+                                <th>Общий вес (кг)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% stats.forEach(function(stat) { %>
+                                <tr>
+                                    <td><%= new Date(stat.month + '-01').toLocaleDateString('ru-RU', { year: 'numeric', month: 'long' }) %></td>
+                                    <td><%= stat.total_weight.toFixed(1) %></td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('monthlyChart').getContext('2d');
+    const stats = <%- JSON.stringify(stats) %>;
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: stats.map(stat => {
+                const date = new Date(stat.month + '-01');
+                return date.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long' });
+            }),
+            datasets: [{
+                label: 'Вес макулатуры (кг)',
+                data: stats.map(stat => stat.total_weight),
+                backgroundColor: '#36A2EB'
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script> 

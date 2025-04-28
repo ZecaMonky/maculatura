@@ -1,0 +1,143 @@
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const db = require('../database');
+const cloudinary = require('../config/cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+// Настройка CloudinaryStorage для multer
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'waste-paper',
+        allowed_formats: ['jpg', 'jpeg', 'png'],
+        transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Middleware для проверки аутентификации
+const isAuthenticated = (req, res, next) => {
+    if (req.session.user) {
+        next();
+    } else {
+        res.redirect('/auth/login');
+    }
+};
+
+// Получение списка типов макулатуры
+router.get('/types', isAuthenticated, (req, res) => {
+    db.all('SELECT * FROM PaperTypes', [], (err, types) => {
+        if (err) {
+            return res.status(500).send('Ошибка сервера');
+        }
+        res.json(types);
+    });
+});
+
+// Страница добавления сдачи макулатуры
+router.get('/add', isAuthenticated, (req, res) => {
+    // Получаем список типов макулатуры
+    db.all('SELECT * FROM PaperTypes ORDER BY name', [], (err, paperTypes) => {
+        if (err) {
+            return res.status(500).send('Ошибка сервера');
+        }
+
+        // Если пользователь - админ, получаем список всех пользователей
+        if (req.session.user.role === 'admin') {
+            db.all('SELECT id, name FROM Users WHERE role = ?', ['worker'], (err, users) => {
+                if (err) {
+                    return res.status(500).send('Ошибка сервера');
+                }
+                res.render('waste/add', { 
+                    user: req.session.user,
+                    paperTypes,
+                    users
+                });
+            });
+        } else {
+            res.render('waste/add', { 
+                user: req.session.user,
+                paperTypes
+            });
+        }
+    });
+});
+
+// Обработка добавления сдачи макулатуры
+router.post('/add', isAuthenticated, upload.single('photo'), (req, res) => {
+    const { date, paper_type_id, weight } = req.body;
+    const user_id = req.session.user.role === 'admin' ? req.body.user_id : req.session.user.id;
+    // Cloudinary: req.file.path содержит URL картинки
+    const photo_path = req.file ? req.file.path : null;
+
+    db.run(
+        'INSERT INTO WasteRecords (user_id, date, paper_type_id, weight, photo_path) VALUES (?, ?, ?, ?, ?)',
+        [user_id, date, paper_type_id, weight, photo_path],
+        function(err) {
+            if (err) {
+                req.session.error = 'Ошибка при добавлении записи';
+                return res.redirect('/waste/add');
+            }
+            req.session.success = 'Запись успешно добавлена!';
+            res.redirect('/waste/history');
+        }
+    );
+});
+
+// История сдачи макулатуры
+router.get('/history', isAuthenticated, (req, res) => {
+    const query = req.session.user.role === 'admin' 
+        ? `SELECT wr.*, u.name as user_name, pt.name as paper_type 
+           FROM WasteRecords wr 
+           JOIN Users u ON wr.user_id = u.id 
+           LEFT JOIN PaperTypes pt ON wr.paper_type_id = pt.id 
+           ORDER BY wr.date DESC`
+        : `SELECT wr.*, pt.name as paper_type 
+           FROM WasteRecords wr 
+           LEFT JOIN PaperTypes pt ON wr.paper_type_id = pt.id 
+           WHERE wr.user_id = ? 
+           ORDER BY wr.date DESC`;
+
+    const params = req.session.user.role === 'admin' ? [] : [req.session.user.id];
+
+    db.all(query, params, (err, records) => {
+        if (err) {
+            return res.status(500).send('Ошибка сервера');
+        }
+        res.render('waste/history', { 
+            user: req.session.user,
+            records
+        });
+    });
+});
+
+// Статистика
+router.get('/stats', isAuthenticated, (req, res) => {
+    const query = req.session.user.role === 'admin'
+        ? `SELECT strftime('%Y-%m', date) as month, SUM(weight) as total_weight 
+           FROM WasteRecords 
+           GROUP BY strftime('%Y-%m', date) 
+           ORDER BY month DESC`
+        : `SELECT strftime('%Y-%m', date) as month, SUM(weight) as total_weight 
+           FROM WasteRecords 
+           WHERE user_id = ? 
+           GROUP BY strftime('%Y-%m', date) 
+           ORDER BY month DESC`;
+
+    const params = req.session.user.role === 'admin' ? [] : [req.session.user.id];
+
+    db.all(query, params, (err, stats) => {
+        if (err) {
+            return res.status(500).send('Ошибка сервера');
+        }
+        res.render('waste/stats', { 
+            user: req.session.user,
+            stats
+        });
+    });
+});
+
+module.exports = router; 

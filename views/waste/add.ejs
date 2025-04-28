@@ -1,0 +1,65 @@
+<div class="row">
+    <div class="col-12">
+        <h2>Добавление сдачи макулатуры</h2>
+        
+        <div class="card">
+            <div class="card-body">
+                <form action="/waste/add" method="POST" enctype="multipart/form-data">
+                    <% if (user.role === 'admin') { %>
+                        <div class="mb-3">
+                            <label for="user_id" class="form-label">Сотрудник</label>
+                            <select class="form-select" id="user_id" name="user_id" required>
+                                <option value="">Выберите сотрудника</option>
+                                <% users.forEach(function(u) { %>
+                                    <option value="<%= u.id %>"><%= u.name %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                    <% } %>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="date" class="form-label">Дата</label>
+                                <input type="date" class="form-control" id="date" name="date" required 
+                                       value="<%= new Date().toISOString().split('T')[0] %>">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="paper_type_id" class="form-label">Тип макулатуры</label>
+                                <select class="form-select" id="paper_type_id" name="paper_type_id" required>
+                                    <option value="">Выберите тип</option>
+                                    <% paperTypes.forEach(function(type) { %>
+                                        <option value="<%= type.id %>"><%= type.name %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="weight" class="form-label">Вес (кг)</label>
+                                <input type="number" class="form-control" id="weight" name="weight" 
+                                       step="0.1" min="0.1" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="photo" class="form-label">Фото (необязательно)</label>
+                                <input type="file" class="form-control" id="photo" name="photo" accept="image/*">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <button type="submit" class="btn btn-primary mt-4">Добавить запись</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div> 

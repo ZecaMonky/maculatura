@@ -1,0 +1,128 @@
+<div class="row">
+    <div class="col-12">
+        <h2>Панель управления</h2>
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Сегодня</h5>
+                        <p class="card-text display-4"><%= todayTotal.toFixed(1) %> кг</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">За неделю</h5>
+                        <p class="card-text display-4"><%= weekTotal.toFixed(1) %> кг</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">За месяц</h5>
+                        <p class="card-text display-4"><%= monthTotal.toFixed(1) %> кг</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h4>Экспорт отчёта</h4>
+            </div>
+            <div class="card-body">
+                <form action="/admin/export" method="GET" class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label">Начальная дата</label>
+                            <input type="date" class="form-control" id="startDate" name="startDate" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="endDate" class="form-label">Конечная дата</label>
+                            <input type="date" class="form-control" id="endDate" name="endDate" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-primary mt-4">Экспортировать</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Статистика по типам макулатуры</h4>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="paperTypesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Статистика по сотрудникам</h4>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="usersChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Установка дат по умолчанию
+    const today = new Date();
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+    
+    document.getElementById('startDate').value = monthAgo.toISOString().split('T')[0];
+    document.getElementById('endDate').value = today.toISOString().split('T')[0];
+    
+    // График по типам макулатуры
+    const paperTypesCtx = document.getElementById('paperTypesChart').getContext('2d');
+    new Chart(paperTypesCtx, {
+        type: 'pie',
+        data: {
+            labels: <%- JSON.stringify(paperTypesStats.map(stat => stat.name ? stat.name : '[Удалён]')) %>,
+            datasets: [{
+                data: <%- JSON.stringify(paperTypesStats.map(stat => stat.total)) %>,
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+            }]
+        }
+    });
+    
+    // График по сотрудникам
+    const usersCtx = document.getElementById('usersChart').getContext('2d');
+    new Chart(usersCtx, {
+        type: 'bar',
+        data: {
+            labels: <%- JSON.stringify(usersStats.map(stat => stat.name)) %>,
+            datasets: [{
+                label: 'Количество сданной макулатуры (кг)',
+                data: <%- JSON.stringify(usersStats.map(stat => stat.total)) %>,
+                backgroundColor: '#36A2EB'
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script> 

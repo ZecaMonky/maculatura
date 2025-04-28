@@ -1,0 +1,74 @@
+<div class="row">
+    <div class="col-12">
+        <h2>Управление пользователями</h2>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Список пользователей</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Имя</th>
+                                <th>Логин</th>
+                                <th>Роль</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% users.forEach(function(user) { %>
+                                <tr>
+                                    <td><%= user.id %></td>
+                                    <td><%= user.name %></td>
+                                    <td><%= user.login %></td>
+                                    <td><%= user.role === 'admin' ? 'Администратор' : 'Работник' %></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteUser(<%= user.id %>)">
+                                            Удалить
+                                        </button>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h4>Добавить нового пользователя</h4>
+            </div>
+            <div class="card-body">
+                <a href="/auth/register" class="btn btn-primary">
+                    Зарегистрировать пользователя
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function deleteUser(userId) {
+    if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+        fetch(`/admin/users/${userId}`, {
+            method: 'DELETE'
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Пользователь успешно удалён!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                response.text().then(text => showToast(text || 'Ошибка при удалении пользователя', 'error'));
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            showToast('Ошибка при удалении пользователя', 'error');
+        });
+    }
+}
+</script> 

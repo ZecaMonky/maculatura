@@ -1,0 +1,80 @@
+<div class="row">
+    <div class="col-12">
+        <h2>Управление типами макулатуры</h2>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Добавить новый тип</h4>
+            </div>
+            <div class="card-body">
+                <form action="/admin/paper-types/add" method="POST" class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Название типа</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-primary mt-4">Добавить</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h4>Список типов макулатуры</h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% types.forEach(function(type) { %>
+                                <tr>
+                                    <td><%= type.id %></td>
+                                    <td><%= type.name %></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" onclick="deletePaperType(<%= type.id %>)">
+                                            Удалить
+                                        </button>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function deletePaperType(typeId) {
+    if (confirm('Вы уверены, что хотите удалить этот тип макулатуры?')) {
+        fetch(`/admin/paper-types/${typeId}`, {
+            method: 'DELETE'
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Тип макулатуры успешно удалён!', 'success');
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                response.text().then(text => showToast(text || 'Ошибка при удалении типа макулатуры', 'error'));
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            showToast('Ошибка при удалении типа макулатуры', 'error');
+        });
+    }
+}
+</script> 
