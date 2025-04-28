@@ -17,7 +17,46 @@ const storage = new CloudinaryStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+console.log('Настройки CloudinaryStorage:', {
+    folder: 'waste-paper',
+    allowed_formats: ['jpg', 'jpeg', 'png'],
+    upload_preset: 'waste_unsigned',
+    transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+});
+
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        console.log('Проверка файла:', {
+            originalname: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size
+        });
+        
+        if (!file.mimetype.startsWith('image/')) {
+            console.error('Неподдерживаемый тип файла:', file.mimetype);
+            return cb(new Error('Только изображения разрешены!'), false);
+        }
+        cb(null, true);
+    }
+});
+
+// Middleware для обработки ошибок multer
+const handleMulterError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        console.error('Ошибка Multer:', {
+            code: err.code,
+            message: err.message,
+            field: err.field
+        });
+        req.session.error = `Ошибка загрузки файла: ${err.message}`;
+        return res.redirect('/waste/add');
+    }
+    next(err);
+};
 
 // Middleware для проверки аутентификации
 const isAuthenticated = (req, res, next) => {
@@ -68,27 +107,49 @@ router.get('/add', isAuthenticated, (req, res) => {
 });
 
 // Обработка добавления сдачи макулатуры
-router.post('/add', isAuthenticated, upload.single('photo'), (req, res) => {
+router.post('/add', isAuthenticated, upload.single('photo'), handleMulterError, (req, res) => {
     try {
+        console.log('Начало обработки запроса /waste/add');
+        console.log('Тело запроса:', req.body);
+        console.log('Файл:', req.file);
+        console.log('Пользователь:', req.session.user);
+
         const { date, paper_type_id, weight } = req.body;
         const user_id = req.session.user.role === 'admin' ? req.body.user_id : req.session.user.id;
         const photo_path = req.file ? req.file.path : null;
+
+        console.log('Подготовленные данные:', {
+            user_id,
+            date,
+            paper_type_id,
+            weight,
+            photo_path
+        });
 
         db.run(
             'INSERT INTO WasteRecords (user_id, date, paper_type_id, weight, photo_path) VALUES (?, ?, ?, ?, ?)',
             [user_id, date, paper_type_id, weight, photo_path],
             function(err) {
                 if (err) {
-                    console.error('Ошибка при добавлении записи:', err?.stack || err);
+                    console.error('Ошибка при добавлении записи в БД:', {
+                        message: err.message,
+                        stack: err.stack,
+                        code: err.code
+                    });
                     req.session.error = 'Ошибка при добавлении записи: ' + (err?.message || err);
                     return res.redirect('/waste/add');
                 }
+                console.log('Запись успешно добавлена, ID:', this.lastID);
                 req.session.success = 'Запись успешно добавлена!';
                 res.redirect('/waste/history');
             }
         );
     } catch (err) {
-        console.error('Ошибка в try/catch:', err?.stack || err);
+        console.error('Критическая ошибка в обработчике /waste/add:', {
+            message: err.message,
+            stack: err.stack,
+            code: err.code
+        });
         req.session.error = 'Ошибка при добавлении записи: ' + (err?.message || err);
         res.redirect('/waste/add');
     }
