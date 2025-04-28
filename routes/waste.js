@@ -69,23 +69,29 @@ router.get('/add', isAuthenticated, (req, res) => {
 
 // Обработка добавления сдачи макулатуры
 router.post('/add', isAuthenticated, upload.single('photo'), (req, res) => {
-    const { date, paper_type_id, weight } = req.body;
-    const user_id = req.session.user.role === 'admin' ? req.body.user_id : req.session.user.id;
-    // Cloudinary: req.file.path содержит URL картинки
-    const photo_path = req.file ? req.file.path : null;
+    try {
+        const { date, paper_type_id, weight } = req.body;
+        const user_id = req.session.user.role === 'admin' ? req.body.user_id : req.session.user.id;
+        const photo_path = req.file ? req.file.path : null;
 
-    db.run(
-        'INSERT INTO WasteRecords (user_id, date, paper_type_id, weight, photo_path) VALUES (?, ?, ?, ?, ?)',
-        [user_id, date, paper_type_id, weight, photo_path],
-        function(err) {
-            if (err) {
-                req.session.error = 'Ошибка при добавлении записи';
-                return res.redirect('/waste/add');
+        db.run(
+            'INSERT INTO WasteRecords (user_id, date, paper_type_id, weight, photo_path) VALUES (?, ?, ?, ?, ?)',
+            [user_id, date, paper_type_id, weight, photo_path],
+            function(err) {
+                if (err) {
+                    console.error('Ошибка при добавлении записи:', err?.stack || err);
+                    req.session.error = 'Ошибка при добавлении записи: ' + (err?.message || err);
+                    return res.redirect('/waste/add');
+                }
+                req.session.success = 'Запись успешно добавлена!';
+                res.redirect('/waste/history');
             }
-            req.session.success = 'Запись успешно добавлена!';
-            res.redirect('/waste/history');
-        }
-    );
+        );
+    } catch (err) {
+        console.error('Ошибка в try/catch:', err?.stack || err);
+        req.session.error = 'Ошибка при добавлении записи: ' + (err?.message || err);
+        res.redirect('/waste/add');
+    }
 });
 
 // История сдачи макулатуры
