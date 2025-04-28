@@ -3,6 +3,7 @@ const session = require('express-session');
 const path = require('path');
 const db = require('./database');
 const expressLayouts = require('express-ejs-layouts');
+const pgSession = require('connect-pg-simple')(session);
 const app = express();
 
 // Инициализация базы данных
@@ -52,12 +53,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Настройка сессий
+// Настройка сессий с использованием PostgreSQL
 app.use(session({
-    secret: 'your-secret-key',
+    store: new pgSession({
+        conString: process.env.DATABASE_URL
+    }),
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' }
+    cookie: { secure: false }
 }));
 
 // Middleware для передачи flash-сообщений из сессии в шаблоны
