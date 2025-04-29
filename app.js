@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
-const pool = require('../pgdb');
+const pool = require('./pgdb');
 const expressLayouts = require('express-ejs-layouts');
 const pgSession = require('connect-pg-simple')(session);
 const app = express();
