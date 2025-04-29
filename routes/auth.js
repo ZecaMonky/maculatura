@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const db = require('../database');
-const { Users } = require('../models');
+const pool = require('../pgdb');
 
 // Middleware для проверки аутентификации
 const isAuthenticated = (req, res, next) => {
@@ -28,32 +27,29 @@ router.get('/login', (req, res) => {
 });
 
 // Обработка входа
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
     const { login, password } = req.body;
-    
-    db.get('SELECT * FROM Users WHERE login = ?', [login], (err, user) => {
-        if (err) {
-            return res.status(500).send('Ошибка сервера');
-        }
-        
+    try {
+        const result = await pool.query('SELECT * FROM "Users" WHERE login = $1', [login]);
+        const user = result.rows[0];
         if (!user) {
             return res.render('auth/login', { error: 'Пользователь не найден' });
         }
-        
-        bcrypt.compare(password, user.password_hash, (err, result) => {
-            if (err || !result) {
-                return res.render('auth/login', { error: 'Неверный пароль' });
-            }
-            
-            req.session.user = {
-                id: user.id,
-                name: user.name,
-                role: user.role
-            };
-            req.session.success = 'Вход выполнен успешно!';
-            res.redirect('/');
-        });
-    });
+        const match = await bcrypt.compare(password, user.password_hash);
+        if (!match) {
+            return res.render('auth/login', { error: 'Неверный пароль' });
+        }
+        req.session.user = {
+            id: user.id,
+            name: user.name,
+            role: user.role
+        };
+        req.session.success = 'Вход выполнен успешно!';
+        res.redirect('/');
+    } catch (err) {
+        console.error('Ошибка при входе:', err);
+        res.status(500).send('Ошибка сервера');
+    }
 });
 
 // Выход
@@ -141,8 +137,8 @@ router.post('/register', async (req, res) => {
         }
 
         // Проверка существования пользователя
-        const existingUser = await Users.findOne({ where: { login } });
-        if (existingUser) {
+        const existingUser = await pool.query('SELECT * FROM "Users" WHERE login = $1', [login]);
+        if (existingUser.rows.length > 0) {
             return res.render('register', { error: 'Пользователь с таким логином уже существует' });
         }
 
@@ -150,12 +146,10 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Создание нового пользователя
-        await Users.create({
-            name,
-            login,
-            password: hashedPassword,
-            role: 'worker' // По умолчанию роль - работник
-        });
+        await pool.query(
+            'INSERT INTO "Users" (name, login, password_hash, role) VALUES ($1, $2, $3, $4)',
+            [name, login, hashedPassword, 'worker']
+        );
 
         req.session.success = 'Регистрация прошла успешно!';
         res.redirect('/auth/login');

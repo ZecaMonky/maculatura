@@ -2,46 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
-const db = require('./database');
+const pool = require('../pgdb');
 const expressLayouts = require('express-ejs-layouts');
 const pgSession = require('connect-pg-simple')(session);
 const app = express();
-
-// Инициализация базы данных
-db.serialize(() => {
-    // Создание таблицы пользователей
-    db.run(`CREATE TABLE IF NOT EXISTS Users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        login TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('admin', 'worker'))
-    )`);
-
-    // Создание таблицы типов макулатуры
-    db.run(`CREATE TABLE IF NOT EXISTS PaperTypes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL
-    )`);
-
-    // Создание таблицы записей макулатуры
-    db.run(`CREATE TABLE IF NOT EXISTS WasteRecords (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        paper_type_id INTEGER NOT NULL,
-        weight REAL NOT NULL,
-        photo_path TEXT,
-        FOREIGN KEY (user_id) REFERENCES Users(id),
-        FOREIGN KEY (paper_type_id) REFERENCES PaperTypes(id)
-    )`);
-
-    // Добавление базовых типов макулатуры
-    const paperTypes = ['Картон', 'Газета', 'Смешанная', 'Офисная бумага'];
-    paperTypes.forEach(type => {
-        db.run(`INSERT OR IGNORE INTO PaperTypes (name) VALUES (?)`, [type]);
-    });
-});
 
 // Настройка шаблонизатора
 app.set('view engine', 'ejs');

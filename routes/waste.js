@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const db = require('../database');
+const pool = require('../pgdb');
 const cloudinary = require('../config/cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
@@ -68,56 +68,49 @@ const isAuthenticated = (req, res, next) => {
 };
 
 // Получение списка типов макулатуры
-router.get('/types', isAuthenticated, (req, res) => {
-    db.all('SELECT * FROM PaperTypes', [], (err, types) => {
-        if (err) {
-            return res.status(500).send('Ошибка сервера');
-        }
-        res.json(types);
-    });
+router.get('/types', isAuthenticated, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM "PaperTypes"');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).send('Ошибка сервера');
+    }
 });
 
 // Страница добавления сдачи макулатуры
-router.get('/add', isAuthenticated, (req, res) => {
-    // Получаем список типов макулатуры
-    db.all('SELECT * FROM PaperTypes ORDER BY name', [], (err, paperTypes) => {
-        if (err) {
-            return res.status(500).send('Ошибка сервера');
-        }
-
-        // Если пользователь - админ, получаем список всех пользователей
+router.get('/add', isAuthenticated, async (req, res) => {
+    try {
+        const paperTypesResult = await pool.query('SELECT * FROM "PaperTypes" ORDER BY name');
+        const paperTypes = paperTypesResult.rows;
         if (req.session.user.role === 'admin') {
-            db.all('SELECT id, name FROM Users WHERE role = ?', ['worker'], (err, users) => {
-                if (err) {
-                    return res.status(500).send('Ошибка сервера');
-                }
-                res.render('waste/add', { 
-                    user: req.session.user,
-                    paperTypes,
-                    users
-                });
+            const usersResult = await pool.query('SELECT id, name FROM "Users" WHERE role = $1', ['worker']);
+            const users = usersResult.rows;
+            res.render('waste/add', {
+                user: req.session.user,
+                paperTypes,
+                users
             });
         } else {
-            res.render('waste/add', { 
+            res.render('waste/add', {
                 user: req.session.user,
                 paperTypes
             });
         }
-    });
+    } catch (err) {
+        res.status(500).send('Ошибка сервера');
+    }
 });
 
 // Обработка добавления сдачи макулатуры
-router.post('/add', isAuthenticated, upload.single('photo'), handleMulterError, (req, res) => {
+router.post('/add', isAuthenticated, upload.single('photo'), handleMulterError, async (req, res) => {
     try {
         console.log('Начало обработки запроса /waste/add');
         console.log('Тело запроса:', req.body);
         console.log('Файл:', req.file);
         console.log('Пользователь:', req.session.user);
-
         const { date, paper_type_id, weight } = req.body;
         const user_id = req.session.user.role === 'admin' ? req.body.user_id : req.session.user.id;
         const photo_path = req.file ? req.file.path : null;
-
         console.log('Подготовленные данные:', {
             user_id,
             date,
@@ -125,25 +118,12 @@ router.post('/add', isAuthenticated, upload.single('photo'), handleMulterError, 
             weight,
             photo_path
         });
-
-        db.run(
-            'INSERT INTO WasteRecords (user_id, date, paper_type_id, weight, photo_path) VALUES (?, ?, ?, ?, ?)',
-            [user_id, date, paper_type_id, weight, photo_path],
-            function(err) {
-                if (err) {
-                    console.error('Ошибка при добавлении записи в БД:', {
-                        message: err.message,
-                        stack: err.stack,
-                        code: err.code
-                    });
-                    req.session.error = 'Ошибка при добавлении записи: ' + (err?.message || err);
-                    return res.redirect('/waste/add');
-                }
-                console.log('Запись успешно добавлена, ID:', this.lastID);
-                req.session.success = 'Запись успешно добавлена!';
-                res.redirect('/waste/history');
-            }
+        await pool.query(
+            'INSERT INTO "WasteRecords" (user_id, date, paper_type_id, weight, photo_path) VALUES ($1, $2, $3, $4, $5)',
+            [user_id, date, paper_type_id, weight, photo_path]
         );
+        req.session.success = 'Запись успешно добавлена!';
+        res.redirect('/waste/history');
     } catch (err) {
         console.error('Критическая ошибка в обработчике /waste/add:', {
             message: err.message,
@@ -156,56 +136,60 @@ router.post('/add', isAuthenticated, upload.single('photo'), handleMulterError, 
 });
 
 // История сдачи макулатуры
-router.get('/history', isAuthenticated, (req, res) => {
-    const query = req.session.user.role === 'admin' 
-        ? `SELECT wr.*, u.name as user_name, pt.name as paper_type 
-           FROM WasteRecords wr 
-           JOIN Users u ON wr.user_id = u.id 
-           LEFT JOIN PaperTypes pt ON wr.paper_type_id = pt.id 
-           ORDER BY wr.date DESC`
-        : `SELECT wr.*, pt.name as paper_type 
-           FROM WasteRecords wr 
-           LEFT JOIN PaperTypes pt ON wr.paper_type_id = pt.id 
-           WHERE wr.user_id = ? 
-           ORDER BY wr.date DESC`;
-
-    const params = req.session.user.role === 'admin' ? [] : [req.session.user.id];
-
-    db.all(query, params, (err, records) => {
-        if (err) {
-            return res.status(500).send('Ошибка сервера');
+router.get('/history', isAuthenticated, async (req, res) => {
+    try {
+        let query, params;
+        if (req.session.user.role === 'admin') {
+            query = `SELECT wr.*, u.name as user_name, pt.name as paper_type 
+                     FROM "WasteRecords" wr 
+                     JOIN "Users" u ON wr.user_id = u.id 
+                     LEFT JOIN "PaperTypes" pt ON wr.paper_type_id = pt.id 
+                     ORDER BY wr.date DESC`;
+            params = [];
+        } else {
+            query = `SELECT wr.*, pt.name as paper_type 
+                     FROM "WasteRecords" wr 
+                     LEFT JOIN "PaperTypes" pt ON wr.paper_type_id = pt.id 
+                     WHERE wr.user_id = $1 
+                     ORDER BY wr.date DESC`;
+            params = [req.session.user.id];
         }
-        res.render('waste/history', { 
+        const result = await pool.query(query, params);
+        res.render('waste/history', {
             user: req.session.user,
-            records
+            records: result.rows
         });
-    });
+    } catch (err) {
+        res.status(500).send('Ошибка сервера');
+    }
 });
 
 // Статистика
-router.get('/stats', isAuthenticated, (req, res) => {
-    const query = req.session.user.role === 'admin'
-        ? `SELECT strftime('%Y-%m', date) as month, SUM(weight) as total_weight 
-           FROM WasteRecords 
-           GROUP BY strftime('%Y-%m', date) 
-           ORDER BY month DESC`
-        : `SELECT strftime('%Y-%m', date) as month, SUM(weight) as total_weight 
-           FROM WasteRecords 
-           WHERE user_id = ? 
-           GROUP BY strftime('%Y-%m', date) 
-           ORDER BY month DESC`;
-
-    const params = req.session.user.role === 'admin' ? [] : [req.session.user.id];
-
-    db.all(query, params, (err, stats) => {
-        if (err) {
-            return res.status(500).send('Ошибка сервера');
+router.get('/stats', isAuthenticated, async (req, res) => {
+    try {
+        let query, params;
+        if (req.session.user.role === 'admin') {
+            query = `SELECT to_char(date, 'YYYY-MM') as month, SUM(weight) as total_weight 
+                     FROM "WasteRecords" 
+                     GROUP BY to_char(date, 'YYYY-MM') 
+                     ORDER BY month DESC`;
+            params = [];
+        } else {
+            query = `SELECT to_char(date, 'YYYY-MM') as month, SUM(weight) as total_weight 
+                     FROM "WasteRecords" 
+                     WHERE user_id = $1 
+                     GROUP BY to_char(date, 'YYYY-MM') 
+                     ORDER BY month DESC`;
+            params = [req.session.user.id];
         }
-        res.render('waste/stats', { 
+        const result = await pool.query(query, params);
+        res.render('waste/stats', {
             user: req.session.user,
-            stats
+            stats: result.rows
         });
-    });
+    } catch (err) {
+        res.status(500).send('Ошибка сервера');
+    }
 });
 
 module.exports = router; 
