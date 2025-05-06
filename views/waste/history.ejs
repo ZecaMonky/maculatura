@@ -75,9 +75,9 @@
 <script>
 let map;
 let marker;
-const mapModal = new bootstrap.Modal(document.getElementById('mapModal'));
 
 function showLocation(lat, lng) {
+    const mapModal = new bootstrap.Modal(document.getElementById('mapModal'));
     setTimeout(() => {
         if (!map) {
             map = L.map('map').setView([lat, lng], 15);
