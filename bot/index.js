@@ -86,10 +86,10 @@ registerConfirmScene.on('text', async (ctx) => {
             await ctx.reply('Ошибка: ' + res.data.error);
             return ctx.scene.enter('register_name');
         }
-        // Получаем userId по логину
+        // ЛОГИРУЕМ логин перед запросом userId
+        console.log('Пробую получить userId для логина:', ctx.session.reg_login);
         const userRes = await api.get(`/auth/userid/${ctx.session.reg_login}`);
         const userId = userRes.data.userId;
-        // Привязываем Telegram
         await api.post('/link-telegram', {
             telegramId: ctx.from.id,
             userId
@@ -114,7 +114,6 @@ const loginPasswordScene = new BaseScene('login_password');
 loginPasswordScene.enter((ctx) => ctx.reply('Введите ваш пароль:'));
 loginPasswordScene.on('text', async (ctx) => {
     try {
-        // Проверяем логин и пароль через API (например, /auth/login, но без сессии)
         const res = await api.post('/auth/login', {
             login: ctx.session.login_login,
             password: ctx.message.text
@@ -123,10 +122,10 @@ loginPasswordScene.on('text', async (ctx) => {
             await ctx.reply('Ошибка: ' + res.data.error);
             return ctx.scene.enter('login');
         }
-        // Получаем userId по логину
+        // ЛОГИРУЕМ логин перед запросом userId
+        console.log('Пробую получить userId для логина:', ctx.session.login_login);
         const userRes = await api.get(`/auth/userid/${ctx.session.login_login}`);
         const userId = userRes.data.userId;
-        // Привязываем Telegram
         await api.post('/link-telegram', {
             telegramId: ctx.from.id,
             userId
@@ -213,6 +212,9 @@ const stage = new Scenes.Stage([
 ]);
 bot.use(session());
 bot.use(stage.middleware());
+
+// Добавляем обработчик команды /start в любой сцене
+stage.command('start', (ctx) => ctx.scene.enter('start'));
 
 // Функция отправки данных на сервер
 async function submitData(ctx) {
