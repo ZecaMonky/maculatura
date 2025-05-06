@@ -16,28 +16,63 @@ router.post('/surrender', checkApiKey, async (req, res) => {
     try {
         const { userId, weight, lat, lon, date, photoUrl } = req.body;
 
+        console.log('Получены данные:', {
+            userId,
+            weight,
+            lat,
+            lon,
+            date,
+            photoUrl
+        });
+
+        // Валидация данных
+        if (!userId || !weight || !lat || !lon || !date) {
+            console.error('Отсутствуют обязательные поля');
+            return res.status(400).json({ error: 'Отсутствуют обязательные поля' });
+        }
+
         // Проверяем существование пользователя в TelegramUsers
+        console.log('Поиск пользователя с telegram_id:', userId);
         let telegramUserResult = await pool.query(
             'SELECT user_id FROM "TelegramUsers" WHERE telegram_id = $1',
             [userId]
         );
+        console.log('Результат поиска пользователя:', telegramUserResult.rows);
 
         if (telegramUserResult.rows.length === 0) {
+            console.error('Пользователь не найден для telegram_id:', userId);
             return res.status(404).json({ error: 'Пользователь не найден' });
         }
 
         const user_id = telegramUserResult.rows[0].user_id;
+        console.log('Найден user_id:', user_id);
 
         // Добавляем запись о сдаче макулатуры
+        console.log('Добавление записи с параметрами:', {
+            user_id,
+            date,
+            paper_type_id: 1,
+            weight,
+            photoUrl,
+            lat,
+            lon,
+            userId
+        });
+
         const result = await pool.query(
             'INSERT INTO "WasteRecords" (user_id, date, paper_type_id, weight, photo_path, latitude, longitude, telegram_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
             [user_id, date, 1, weight, photoUrl, lat, lon, userId]
         );
 
+        console.log('Запись успешно добавлена, id:', result.rows[0].id);
         res.json({ success: true, recordId: result.rows[0].id });
     } catch (error) {
-        console.error('Ошибка при сохранении данных:', error);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Ошибка при сохранении данных:', {
+            error: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
     }
 });
 

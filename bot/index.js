@@ -297,14 +297,20 @@ stage.command('start', (ctx) => ctx.scene.enter('start'));
 // Функция отправки данных на сервер
 async function submitData(ctx) {
     try {
+        // Форматируем дату в формат YYYY-MM-DD
+        const currentDate = new Date();
+        const formattedDate = currentDate.toISOString().split('T')[0];
+
         const data = {
             userId: ctx.from.id,
-            weight: ctx.session.weight,
-            lat: ctx.session.location.latitude,
-            lon: ctx.session.location.longitude,
-            date: new Date().toISOString(),
+            weight: Number(ctx.session.weight), // Убеждаемся, что вес - число
+            lat: Number(ctx.session.location.latitude), // Убеждаемся, что координаты - числа
+            lon: Number(ctx.session.location.longitude),
+            date: formattedDate,
             photoUrl: ctx.session.photoUrl || null
         };
+
+        console.log('Подготовленные данные для отправки:', data);
 
         const response = await api.post('/api/surrender', data);
         
@@ -320,7 +326,13 @@ async function submitData(ctx) {
             status: error.response?.status,
             config: error.config
         });
-        await ctx.reply('Произошла ошибка при сохранении данных. Попробуйте позже.');
+
+        // Более информативное сообщение об ошибке
+        let errorMessage = 'Произошла ошибка при сохранении данных.';
+        if (error.response?.data?.error) {
+            errorMessage += ' Причина: ' + error.response.data.error;
+        }
+        await ctx.reply(errorMessage + ' Пожалуйста, попробуйте позже.');
     }
     
     // Очистка сессии
