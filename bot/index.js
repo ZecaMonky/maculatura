@@ -12,11 +12,43 @@ cloudinary.config({
 
 // Создание экземпляра axios с предустановленными заголовками
 const api = axios.create({
-    baseURL: 'https://maculatura.onrender.com/api',
+    baseURL: process.env.API_URL || 'https://maculatura.onrender.com/api',
     headers: {
         'x-api-key': process.env.API_KEY
+    },
+    validateStatus: function (status) {
+        return status >= 200 && status < 500; // Разрешаем обработку 4xx ошибок
     }
 });
+
+// Добавляем интерцептор для логирования запросов
+api.interceptors.request.use(request => {
+    console.log('Отправка запроса:', {
+        method: request.method,
+        url: request.url,
+        data: request.data
+    });
+    return request;
+});
+
+// Добавляем интерцептор для логирования ответов
+api.interceptors.response.use(
+    response => {
+        console.log('Получен ответ:', {
+            status: response.status,
+            data: response.data
+        });
+        return response;
+    },
+    error => {
+        console.error('Ошибка API:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
+        return Promise.reject(error);
+    }
+);
 
 // Создание бота
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -104,35 +136,49 @@ registerConfirmScene.on('text', async (ctx) => {
 
 // --- Авторизация ---
 const loginScene = new BaseScene('login');
-loginScene.enter((ctx) => ctx.reply('Введите ваш логин:'));
+loginScene.enter((ctx) => {
+    console.log('Вход в сцену логина');
+    ctx.reply('Введите ваш логин:');
+});
 loginScene.on('text', (ctx) => {
+    console.log('Получен логин:', ctx.message.text);
     ctx.session.login_login = ctx.message.text;
     ctx.scene.enter('login_password');
 });
 
 const loginPasswordScene = new BaseScene('login_password');
-loginPasswordScene.enter((ctx) => ctx.reply('Введите ваш пароль:'));
+loginPasswordScene.enter((ctx) => {
+    console.log('Вход в сцену пароля');
+    ctx.reply('Введите ваш пароль:');
+});
 loginPasswordScene.on('text', async (ctx) => {
     try {
+        console.log('Попытка авторизации для логина:', ctx.session.login_login);
         const res = await api.post('/auth/login', {
             login: ctx.session.login_login,
             password: ctx.message.text
         });
         if (res.data && res.data.error) {
+            console.error('Ошибка авторизации:', res.data.error);
             await ctx.reply('Ошибка: ' + res.data.error);
             return ctx.scene.enter('login');
         }
-        // ЛОГИРУЕМ логин перед запросом userId
-        console.log('Пробую получить userId для логина:', ctx.session.login_login);
+        
+        console.log('Авторизация успешна, получаем userId');
         const userRes = await api.get(`/auth/userid/${ctx.session.login_login}`);
+        console.log('Ответ получения userId:', userRes.data);
         const userId = userRes.data.userId;
+        
+        console.log('Привязка Telegram ID:', ctx.from.id, 'к userId:', userId);
         await api.post('/link-telegram', {
             telegramId: ctx.from.id,
             userId
         });
+        
         await ctx.reply('Привязка Telegram к аккаунту прошла успешно! Теперь вы можете сдавать макулатуру.', { reply_markup: { remove_keyboard: true } });
         ctx.scene.enter('weight');
     } catch (e) {
+        console.error('Ошибка при авторизации:', e.response?.data || e.message);
         await ctx.reply('Ошибка при авторизации: ' + (e.response?.data?.error || e.message));
         ctx.scene.enter('login');
     }
@@ -245,8 +291,13 @@ async function submitData(ctx) {
     return ctx.scene.leave();
 }
 
-// Команда /start
-bot.command('start', (ctx) => ctx.scene.enter('start'));
+// Команда /start с очисткой сессии
+bot.command('start', (ctx) => {
+    console.log('Получена команда /start от пользователя:', ctx.from.id);
+    // Очищаем сессию перед началом
+    ctx.session = {};
+    return ctx.scene.enter('start');
+});
 
 // Команда /surrender для начала процесса сдачи
 bot.command('surrender', (ctx) => ctx.scene.enter('weight'));

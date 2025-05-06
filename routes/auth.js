@@ -163,13 +163,21 @@ router.post('/register', async (req, res) => {
 router.get('/userid/:login', async (req, res) => {
     try {
         const { login } = req.params;
+        console.log('Получен запрос userId для логина:', login);
+        
         const result = await pool.query('SELECT id FROM "Users" WHERE login = $1', [login]);
+        console.log('Результат запроса:', result.rows);
+        
         if (result.rows.length === 0) {
+            console.log('Пользователь не найден для логина:', login);
             return res.status(404).json({ error: 'Пользователь не найден' });
         }
+        
+        console.log('Найден userId:', result.rows[0].id, 'для логина:', login);
         res.json({ userId: result.rows[0].id });
     } catch (error) {
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Ошибка при получении userId:', error);
+        res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
     }
 });
 
