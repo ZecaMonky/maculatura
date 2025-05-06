@@ -12,21 +12,25 @@ cloudinary.config({
 
 // Создание экземпляра axios с предустановленными заголовками
 const api = axios.create({
-    baseURL: process.env.API_URL || 'https://maculatura.onrender.com/api',
+    baseURL: process.env.API_URL || 'https://maculatura.onrender.com',
     headers: {
         'x-api-key': process.env.API_KEY
     },
     validateStatus: function (status) {
-        return status >= 200 && status < 500; // Разрешаем обработку 4xx ошибок
+        return status >= 200 && status < 500;
     }
 });
 
 // Добавляем интерцептор для логирования запросов
 api.interceptors.request.use(request => {
+    if (!request.url.startsWith('/api')) {
+        request.url = '/api' + request.url;
+    }
     console.log('Отправка запроса:', {
         method: request.method,
         url: request.url,
-        data: request.data
+        data: request.data,
+        baseURL: request.baseURL
     });
     return request;
 });
@@ -158,6 +162,14 @@ loginPasswordScene.on('text', async (ctx) => {
             login: ctx.session.login_login,
             password: ctx.message.text
         });
+
+        // Проверяем статус ответа
+        if (res.status === 404) {
+            console.error('Ошибка 404: Маршрут не найден');
+            await ctx.reply('Ошибка сервера. Пожалуйста, попробуйте позже.');
+            return ctx.scene.enter('start');
+        }
+
         if (res.data && res.data.error) {
             console.error('Ошибка авторизации:', res.data.error);
             await ctx.reply('Ошибка: ' + res.data.error);
@@ -166,21 +178,37 @@ loginPasswordScene.on('text', async (ctx) => {
         
         console.log('Авторизация успешна, получаем userId');
         const userRes = await api.get(`/auth/userid/${ctx.session.login_login}`);
+        
+        if (!userRes.data || !userRes.data.userId) {
+            console.error('Ошибка: userId не получен');
+            await ctx.reply('Ошибка при получении данных пользователя. Пожалуйста, попробуйте позже.');
+            return ctx.scene.enter('start');
+        }
+
         console.log('Ответ получения userId:', userRes.data);
         const userId = userRes.data.userId;
         
         console.log('Привязка Telegram ID:', ctx.from.id, 'к userId:', userId);
-        await api.post('/link-telegram', {
+        const linkRes = await api.post('/link-telegram', {
             telegramId: ctx.from.id,
             userId
         });
+
+        if (linkRes.data && linkRes.data.error) {
+            console.error('Ошибка привязки Telegram:', linkRes.data.error);
+            await ctx.reply('Ошибка при привязке Telegram: ' + linkRes.data.error);
+            return ctx.scene.enter('start');
+        }
         
         await ctx.reply('Привязка Telegram к аккаунту прошла успешно! Теперь вы можете сдавать макулатуру.', { reply_markup: { remove_keyboard: true } });
         ctx.scene.enter('weight');
     } catch (e) {
         console.error('Ошибка при авторизации:', e.response?.data || e.message);
-        await ctx.reply('Ошибка при авторизации: ' + (e.response?.data?.error || e.message));
-        ctx.scene.enter('login');
+        const errorMessage = e.response?.data?.error || 
+                           e.response?.status === 404 ? 'Сервер недоступен. Пожалуйста, попробуйте позже.' :
+                           'Произошла ошибка. Пожалуйста, попробуйте позже.';
+        await ctx.reply(errorMessage);
+        ctx.scene.enter('start');
     }
 });
 
