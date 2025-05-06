@@ -23,14 +23,13 @@ const api = axios.create({
 
 // Добавляем интерцептор для логирования запросов
 api.interceptors.request.use(request => {
-    if (!request.url.startsWith('/api')) {
-        request.url = '/api' + request.url;
-    }
+    // Убираем добавление /api к URL
     console.log('Отправка запроса:', {
         method: request.method,
         url: request.url,
         data: request.data,
-        baseURL: request.baseURL
+        baseURL: request.baseURL,
+        fullUrl: request.baseURL + request.url
     });
     return request;
 });
@@ -189,7 +188,7 @@ loginPasswordScene.on('text', async (ctx) => {
         const userId = userRes.data.userId;
         
         console.log('Привязка Telegram ID:', ctx.from.id, 'к userId:', userId);
-        const linkRes = await api.post('/link-telegram', {
+        const linkRes = await api.post('/api/link-telegram', {
             telegramId: ctx.from.id,
             userId
         });
@@ -203,7 +202,12 @@ loginPasswordScene.on('text', async (ctx) => {
         await ctx.reply('Привязка Telegram к аккаунту прошла успешно! Теперь вы можете сдавать макулатуру.', { reply_markup: { remove_keyboard: true } });
         ctx.scene.enter('weight');
     } catch (e) {
-        console.error('Ошибка при авторизации:', e.response?.data || e.message);
+        console.error('Ошибка при авторизации:', {
+            error: e.message,
+            response: e.response?.data,
+            status: e.response?.status,
+            config: e.config
+        });
         const errorMessage = e.response?.data?.error || 
                            e.response?.status === 404 ? 'Сервер недоступен. Пожалуйста, попробуйте позже.' :
                            'Произошла ошибка. Пожалуйста, попробуйте позже.';
@@ -302,7 +306,7 @@ async function submitData(ctx) {
             photoUrl: ctx.session.photoUrl || null
         };
 
-        const response = await api.post('/surrender', data);
+        const response = await api.post('/api/surrender', data);
         
         if (response.status === 200) {
             await ctx.reply('Данные успешно сохранены! 👍');
@@ -310,7 +314,12 @@ async function submitData(ctx) {
             throw new Error('Ошибка сервера');
         }
     } catch (error) {
-        console.error('Ошибка при отправке данных:', error);
+        console.error('Ошибка при отправке данных:', {
+            error: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            config: error.config
+        });
         await ctx.reply('Произошла ошибка при сохранении данных. Попробуйте позже.');
     }
     
@@ -333,10 +342,15 @@ bot.command('surrender', (ctx) => ctx.scene.enter('weight'));
 // Команда /stats
 bot.command('stats', async (ctx) => {
     try {
-        const response = await api.get(`/stats/${ctx.from.id}`);
+        const response = await api.get(`/api/stats/${ctx.from.id}`);
         const stats = response.data;
         await ctx.reply(`Ваша статистика:\nВсего сдано: ${stats.totalWeight} кг\nКоличество сдач: ${stats.count}`);
     } catch (error) {
+        console.error('Ошибка при получении статистики:', {
+            error: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
         await ctx.reply('Не удалось получить статистику');
     }
 });
@@ -344,7 +358,7 @@ bot.command('stats', async (ctx) => {
 // Команда /history
 bot.command('history', async (ctx) => {
     try {
-        const response = await api.get(`/history/${ctx.from.id}`);
+        const response = await api.get(`/api/history/${ctx.from.id}`);
         const history = response.data;
         
         if (history.length === 0) {
@@ -357,6 +371,11 @@ bot.command('history', async (ctx) => {
 
         await ctx.reply(`Последние записи:\n\n${message}`);
     } catch (error) {
+        console.error('Ошибка при получении истории:', {
+            error: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
         await ctx.reply('Не удалось получить историю');
     }
 });
