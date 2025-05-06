@@ -12,6 +12,7 @@
                                 <th>Тип макулатуры</th>
                                 <th>Вес (кг)</th>
                                 <th>Фото</th>
+                                <th>Местоположение</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -33,12 +34,64 @@
                                             Нет фото
                                         <% } %>
                                     </td>
+                                    <td>
+                                        <% if (record.latitude && record.longitude) { %>
+                                            <button type="button" class="btn btn-sm btn-secondary" 
+                                                    onclick="showLocation(<%= record.latitude %>, <%= record.longitude %>)">
+                                                Показать на карте
+                                            </button>
+                                        <% } else { %>
+                                            <span class="text-muted">Нет данных</span>
+                                        <% } %>
+                                    </td>
                                 </tr>
                             <% }); %>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Модальное окно для карты -->
+                <div class="modal fade" id="mapModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Местоположение сдачи</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="map" style="height: 400px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div> 
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+let map;
+let marker;
+const mapModal = new bootstrap.Modal(document.getElementById('mapModal'));
+
+function showLocation(lat, lng) {
+    setTimeout(() => {
+        if (!map) {
+            map = L.map('map').setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            marker = L.marker([lat, lng]).addTo(map)
+                .bindPopup('Место сдачи').openPopup();
+        } else {
+            map.setView([lat, lng], 15);
+            marker.setLatLng([lat, lng]);
+        }
+    }, 300); // Ждём, чтобы модалка успела открыться
+    mapModal.show();
+}
+</script> 

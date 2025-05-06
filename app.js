@@ -52,11 +52,13 @@ const authRoutes = require('./routes/auth');
 const wasteRoutes = require('./routes/waste');
 const adminRoutes = require('./routes/admin');
 const profileRoutes = require('./routes/profile');
+const apiRoutes = require('./routes/api');
 
 app.use('/auth', authRoutes);
 app.use('/waste', wasteRoutes);
 app.use('/admin', adminRoutes);
 app.use('/profile', profileRoutes);
+app.use('/api', apiRoutes);
 
 // Главная страница
 app.get('/', (req, res) => {

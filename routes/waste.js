@@ -108,20 +108,26 @@ router.post('/add', isAuthenticated, upload.single('photo'), handleMulterError, 
         console.log('Тело запроса:', req.body);
         console.log('Файл:', req.file);
         console.log('Пользователь:', req.session.user);
-        const { date, paper_type_id, weight } = req.body;
+
+        const { date, paper_type_id, weight, latitude, longitude } = req.body;
         const user_id = req.session.user.role === 'admin' ? req.body.user_id : req.session.user.id;
         const photo_path = req.file ? req.file.path : null;
+
         console.log('Подготовленные данные:', {
             user_id,
             date,
             paper_type_id,
             weight,
-            photo_path
+            photo_path,
+            latitude,
+            longitude
         });
+
         await pool.query(
-            'INSERT INTO "WasteRecords" (user_id, date, paper_type_id, weight, photo_path) VALUES ($1, $2, $3, $4, $5)',
-            [user_id, date, paper_type_id, weight, photo_path]
+            'INSERT INTO "WasteRecords" (user_id, date, paper_type_id, weight, photo_path, latitude, longitude) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [user_id, date, paper_type_id, weight, photo_path, latitude, longitude]
         );
+
         req.session.success = 'Запись успешно добавлена!';
         res.redirect('/waste/history');
     } catch (err) {

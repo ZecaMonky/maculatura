@@ -54,12 +54,97 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <button type="submit" class="btn btn-primary mt-4">Добавить запись</button>
+                                <label class="form-label">Геопозиция</label>
+                                <div class="d-flex align-items-center">
+                                    <button type="button" class="btn btn-secondary" onclick="getLocation()">
+                                        Определить местоположение
+                                    </button>
+                                    <div id="locationStatus" class="ms-3"></div>
+                                </div>
+                                <input type="hidden" id="latitude" name="latitude">
+                                <input type="hidden" id="longitude" name="longitude">
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div id="map" style="height: 300px; width: 100%; display: none;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Добавить запись</button>
                         </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-</div> 
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+let map;
+let marker;
+
+function getLocation() {
+    const statusDiv = document.getElementById('locationStatus');
+    const mapDiv = document.getElementById('map');
+
+    if (!navigator.geolocation) {
+        statusDiv.innerHTML = 'Геолокация не поддерживается вашим браузером';
+        return;
+    }
+
+    statusDiv.innerHTML = 'Определение местоположения...';
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            
+            document.getElementById('latitude').value = latitude;
+            document.getElementById('longitude').value = longitude;
+            
+            statusDiv.innerHTML = 'Местоположение определено';
+            statusDiv.className = 'text-success';
+            
+            // Показываем карту
+            mapDiv.style.display = 'block';
+            if (!map) {
+                map = L.map('map').setView([latitude, longitude], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+                marker = L.marker([latitude, longitude]).addTo(map)
+                    .bindPopup('Ваше местоположение').openPopup();
+            } else {
+                map.setView([latitude, longitude], 15);
+                marker.setLatLng([latitude, longitude]);
+            }
+        },
+        (error) => {
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    statusDiv.innerHTML = 'Доступ к геолокации запрещен';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    statusDiv.innerHTML = 'Информация о местоположении недоступна';
+                    break;
+                case error.TIMEOUT:
+                    statusDiv.innerHTML = 'Превышено время ожидания';
+                    break;
+                default:
+                    statusDiv.innerHTML = 'Произошла неизвестная ошибка';
+                    break;
+            }
+            statusDiv.className = 'text-danger';
+        }
+    );
+}
+</script> 
