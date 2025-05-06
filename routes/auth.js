@@ -159,4 +159,18 @@ router.post('/register', async (req, res) => {
     }
 });
 
+// Получить userId по логину (для Telegram-бота)
+router.get('/userid/:login', async (req, res) => {
+    try {
+        const { login } = req.params;
+        const result = await pool.query('SELECT id FROM "Users" WHERE login = $1', [login]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Пользователь не найден' });
+        }
+        res.json({ userId: result.rows[0].id });
+    } catch (error) {
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
 module.exports = router; 

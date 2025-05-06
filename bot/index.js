@@ -21,6 +21,124 @@ const api = axios.create({
 // Создание бота
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
+// --- Новые сцены для регистрации и авторизации ---
+const { BaseScene } = Scenes;
+
+// Сцена выбора действия
+const startScene = new BaseScene('start');
+startScene.enter((ctx) => {
+    ctx.reply('У вас уже есть аккаунт на сайте?', {
+        reply_markup: {
+            keyboard: [['Войти', 'Зарегистрироваться']],
+            resize_keyboard: true,
+            one_time_keyboard: true
+        }
+    });
+});
+startScene.on('text', async (ctx) => {
+    if (ctx.message.text === 'Войти') {
+        ctx.scene.enter('login');
+    } else if (ctx.message.text === 'Зарегистрироваться') {
+        ctx.scene.enter('register_name');
+    } else {
+        ctx.reply('Пожалуйста, выберите действие: Войти или Зарегистрироваться');
+    }
+});
+
+// --- Регистрация ---
+const registerNameScene = new BaseScene('register_name');
+registerNameScene.enter((ctx) => ctx.reply('Введите ваше ФИО:'));
+registerNameScene.on('text', (ctx) => {
+    ctx.session.reg_name = ctx.message.text;
+    ctx.scene.enter('register_login');
+});
+
+const registerLoginScene = new BaseScene('register_login');
+registerLoginScene.enter((ctx) => ctx.reply('Придумайте логин:'));
+registerLoginScene.on('text', (ctx) => {
+    ctx.session.reg_login = ctx.message.text;
+    ctx.scene.enter('register_password');
+});
+
+const registerPasswordScene = new BaseScene('register_password');
+registerPasswordScene.enter((ctx) => ctx.reply('Придумайте пароль:'));
+registerPasswordScene.on('text', (ctx) => {
+    ctx.session.reg_password = ctx.message.text;
+    ctx.scene.enter('register_confirm');
+});
+
+const registerConfirmScene = new BaseScene('register_confirm');
+registerConfirmScene.enter((ctx) => ctx.reply('Повторите пароль:'));
+registerConfirmScene.on('text', async (ctx) => {
+    if (ctx.message.text !== ctx.session.reg_password) {
+        await ctx.reply('Пароли не совпадают. Попробуйте снова.');
+        return ctx.scene.enter('register_password');
+    }
+    // Отправляем данные на API регистрации
+    try {
+        const res = await api.post('/auth/register', {
+            name: ctx.session.reg_name,
+            login: ctx.session.reg_login,
+            password: ctx.session.reg_password,
+            confirmPassword: ctx.message.text
+        });
+        if (res.data && res.data.error) {
+            await ctx.reply('Ошибка: ' + res.data.error);
+            return ctx.scene.enter('register_name');
+        }
+        // Получаем userId по логину
+        const userRes = await api.get(`/auth/userid/${ctx.session.reg_login}`);
+        const userId = userRes.data.userId;
+        // Привязываем Telegram
+        await api.post('/link-telegram', {
+            telegramId: ctx.from.id,
+            userId
+        });
+        await ctx.reply('Регистрация и привязка Telegram прошли успешно! Теперь вы можете сдавать макулатуру.', { reply_markup: { remove_keyboard: true } });
+        ctx.scene.enter('weight');
+    } catch (e) {
+        await ctx.reply('Ошибка при регистрации: ' + (e.response?.data?.error || e.message));
+        ctx.scene.enter('register_name');
+    }
+});
+
+// --- Авторизация ---
+const loginScene = new BaseScene('login');
+loginScene.enter((ctx) => ctx.reply('Введите ваш логин:'));
+loginScene.on('text', (ctx) => {
+    ctx.session.login_login = ctx.message.text;
+    ctx.scene.enter('login_password');
+});
+
+const loginPasswordScene = new BaseScene('login_password');
+loginPasswordScene.enter((ctx) => ctx.reply('Введите ваш пароль:'));
+loginPasswordScene.on('text', async (ctx) => {
+    try {
+        // Проверяем логин и пароль через API (например, /auth/login, но без сессии)
+        const res = await api.post('/auth/login', {
+            login: ctx.session.login_login,
+            password: ctx.message.text
+        });
+        if (res.data && res.data.error) {
+            await ctx.reply('Ошибка: ' + res.data.error);
+            return ctx.scene.enter('login');
+        }
+        // Получаем userId по логину
+        const userRes = await api.get(`/auth/userid/${ctx.session.login_login}`);
+        const userId = userRes.data.userId;
+        // Привязываем Telegram
+        await api.post('/link-telegram', {
+            telegramId: ctx.from.id,
+            userId
+        });
+        await ctx.reply('Привязка Telegram к аккаунту прошла успешно! Теперь вы можете сдавать макулатуру.', { reply_markup: { remove_keyboard: true } });
+        ctx.scene.enter('weight');
+    } catch (e) {
+        await ctx.reply('Ошибка при авторизации: ' + (e.response?.data?.error || e.message));
+        ctx.scene.enter('login');
+    }
+});
+
 // Сцена ввода веса
 const weightScene = new Scenes.BaseScene('weight');
 weightScene.enter((ctx) => ctx.reply('Введите вес макулатуры в килограммах:'));
@@ -81,7 +199,18 @@ photoScene.on('photo', async (ctx) => {
 });
 
 // Настройка сцен
-const stage = new Scenes.Stage([weightScene, locationScene, photoScene]);
+const stage = new Scenes.Stage([
+    startScene,
+    registerNameScene,
+    registerLoginScene,
+    registerPasswordScene,
+    registerConfirmScene,
+    loginScene,
+    loginPasswordScene,
+    weightScene,
+    locationScene,
+    photoScene
+]);
 bot.use(session());
 bot.use(stage.middleware());
 
@@ -115,9 +244,7 @@ async function submitData(ctx) {
 }
 
 // Команда /start
-bot.command('start', (ctx) => {
-    ctx.reply('Добро пожаловать! Для сдачи макулатуры введите /surrender');
-});
+bot.command('start', (ctx) => ctx.scene.enter('start'));
 
 // Команда /surrender для начала процесса сдачи
 bot.command('surrender', (ctx) => ctx.scene.enter('weight'));
