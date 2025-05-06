@@ -225,6 +225,60 @@ weightScene.on('text', async (ctx) => {
         return ctx.reply('Пожалуйста, введите корректное число больше 0');
     }
     ctx.session.weight = weight;
+    
+    try {
+        // Получаем список типов макулатуры
+        const response = await api.get('/api/paper-types');
+        const paperTypes = response.data;
+        
+        if (!paperTypes || paperTypes.length === 0) {
+            // Если типов нет, используем базовый тип
+            ctx.session.paper_type_id = null;
+            await ctx.reply('Теперь отправьте вашу геолокацию', {
+                reply_markup: {
+                    keyboard: [[{ text: 'Отправить геолокацию', request_location: true }]],
+                    resize_keyboard: true
+                }
+            });
+            return ctx.scene.enter('location');
+        }
+
+        // Создаем клавиатуру с типами макулатуры
+        const keyboard = paperTypes.map(type => [type.name]);
+        ctx.session.paperTypes = paperTypes; // Сохраняем типы в сессии для последующего использования
+        
+        await ctx.reply('Выберите тип макулатуры:', {
+            reply_markup: {
+                keyboard: keyboard,
+                resize_keyboard: true,
+                one_time_keyboard: true
+            }
+        });
+        return ctx.scene.enter('paper_type');
+    } catch (error) {
+        console.error('Ошибка при получении типов макулатуры:', error);
+        await ctx.reply('Произошла ошибка. Попробуйте позже.');
+        return ctx.scene.enter('start');
+    }
+});
+
+// Сцена выбора типа макулатуры
+const paperTypeScene = new Scenes.BaseScene('paper_type');
+paperTypeScene.enter((ctx) => {
+    if (!ctx.session.paperTypes) {
+        ctx.reply('Произошла ошибка. Начните сначала.');
+        return ctx.scene.enter('start');
+    }
+});
+
+paperTypeScene.on('text', async (ctx) => {
+    const selectedType = ctx.session.paperTypes.find(type => type.name === ctx.message.text);
+    
+    if (!selectedType) {
+        return ctx.reply('Пожалуйста, выберите тип макулатуры из списка');
+    }
+    
+    ctx.session.paper_type_id = selectedType.id;
     await ctx.reply('Теперь отправьте вашу геолокацию', {
         reply_markup: {
             keyboard: [[{ text: 'Отправить геолокацию', request_location: true }]],
@@ -285,6 +339,7 @@ const stage = new Scenes.Stage([
     loginScene,
     loginPasswordScene,
     weightScene,
+    paperTypeScene,
     locationScene,
     photoScene
 ]);
@@ -303,8 +358,9 @@ async function submitData(ctx) {
 
         const data = {
             userId: ctx.from.id,
-            weight: Number(ctx.session.weight), // Убеждаемся, что вес - число
-            lat: Number(ctx.session.location.latitude), // Убеждаемся, что координаты - числа
+            weight: Number(ctx.session.weight),
+            paper_type_id: ctx.session.paper_type_id,
+            lat: Number(ctx.session.location.latitude),
             lon: Number(ctx.session.location.longitude),
             date: formattedDate,
             photoUrl: ctx.session.photoUrl || null
@@ -327,7 +383,6 @@ async function submitData(ctx) {
             config: error.config
         });
 
-        // Более информативное сообщение об ошибке
         let errorMessage = 'Произошла ошибка при сохранении данных.';
         if (error.response?.data?.error) {
             errorMessage += ' Причина: ' + error.response.data.error;

@@ -11,10 +11,21 @@ const checkApiKey = (req, res, next) => {
     next();
 };
 
+// GET /api/paper-types - Получение списка типов макулатуры
+router.get('/paper-types', checkApiKey, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, name FROM "PaperTypes" ORDER BY name');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Ошибка при получении типов макулатуры:', error);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
 // POST /api/surrender - Сохранение данных о сдаче макулатуры
 router.post('/surrender', checkApiKey, async (req, res) => {
     try {
-        const { userId, weight, lat, lon, date, photoUrl } = req.body;
+        const { userId, weight, lat, lon, date, photoUrl, paper_type_id } = req.body;
 
         console.log('Получены данные:', {
             userId,
@@ -22,7 +33,8 @@ router.post('/surrender', checkApiKey, async (req, res) => {
             lat,
             lon,
             date,
-            photoUrl
+            photoUrl,
+            paper_type_id
         });
 
         // Валидация данных
@@ -47,11 +59,27 @@ router.post('/surrender', checkApiKey, async (req, res) => {
         const user_id = telegramUserResult.rows[0].user_id;
         console.log('Найден user_id:', user_id);
 
+        // Если тип макулатуры не указан, получаем первый доступный
+        let final_paper_type_id = paper_type_id;
+        if (!final_paper_type_id) {
+            const paperTypeResult = await pool.query('SELECT id FROM "PaperTypes" ORDER BY id LIMIT 1');
+            if (paperTypeResult.rows.length === 0) {
+                // Если типов нет, создаем базовый тип
+                const newTypeResult = await pool.query(
+                    'INSERT INTO "PaperTypes" (name) VALUES ($1) RETURNING id',
+                    ['Общая макулатура']
+                );
+                final_paper_type_id = newTypeResult.rows[0].id;
+            } else {
+                final_paper_type_id = paperTypeResult.rows[0].id;
+            }
+        }
+
         // Добавляем запись о сдаче макулатуры
         console.log('Добавление записи с параметрами:', {
             user_id,
             date,
-            paper_type_id: 1,
+            paper_type_id: final_paper_type_id,
             weight,
             photoUrl,
             lat,
@@ -61,7 +89,7 @@ router.post('/surrender', checkApiKey, async (req, res) => {
 
         const result = await pool.query(
             'INSERT INTO "WasteRecords" (user_id, date, paper_type_id, weight, photo_path, latitude, longitude, telegram_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-            [user_id, date, 1, weight, photoUrl, lat, lon, userId]
+            [user_id, date, final_paper_type_id, weight, photoUrl, lat, lon, userId]
         );
 
         console.log('Запись успешно добавлена, id:', result.rows[0].id);
@@ -131,6 +159,8 @@ router.post('/link-telegram', checkApiKey, async (req, res) => {
     try {
         const { telegramId, userId } = req.body;
 
+        console.log('Попытка привязки:', { telegramId, userId });
+
         // Проверяем существование пользователя
         const userExists = await pool.query(
             'SELECT id FROM "Users" WHERE id = $1',
@@ -138,17 +168,19 @@ router.post('/link-telegram', checkApiKey, async (req, res) => {
         );
 
         if (userExists.rows.length === 0) {
+            console.error('Пользователь не найден:', userId);
             return res.status(404).json({ error: 'Пользователь не найден' });
         }
 
-        // Проверяем, не привязан ли уже этот Telegram ID
-        const telegramExists = await pool.query(
-            'SELECT id FROM "TelegramUsers" WHERE telegram_id = $1',
-            [telegramId]
+        // Проверяем, не привязан ли уже этот пользователь к этому Telegram ID
+        const existingLink = await pool.query(
+            'SELECT id FROM "TelegramUsers" WHERE telegram_id = $1 AND user_id = $2',
+            [telegramId, userId]
         );
 
-        if (telegramExists.rows.length > 0) {
-            return res.status(400).json({ error: 'Этот Telegram аккаунт уже привязан' });
+        if (existingLink.rows.length > 0) {
+            console.log('Связь уже существует');
+            return res.json({ success: true, message: 'Аккаунт уже привязан' });
         }
 
         // Создаем связь
@@ -157,10 +189,15 @@ router.post('/link-telegram', checkApiKey, async (req, res) => {
             [telegramId, userId]
         );
 
+        console.log('Связь успешно создана');
         res.json({ success: true });
     } catch (error) {
-        console.error('Ошибка при связывании аккаунтов:', error);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        console.error('Ошибка при связывании аккаунтов:', {
+            error: error.message,
+            stack: error.stack,
+            code: error.code
+        });
+        res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
     }
 });
 
