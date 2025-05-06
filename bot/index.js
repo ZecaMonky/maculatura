@@ -80,6 +80,11 @@ photoScene.on('photo', async (ctx) => {
     }
 });
 
+// Настройка сцен
+const stage = new Scenes.Stage([weightScene, locationScene, photoScene]);
+bot.use(session());
+bot.use(stage.middleware());
+
 // Функция отправки данных на сервер
 async function submitData(ctx) {
     try {
@@ -160,11 +165,6 @@ bot.command('help', (ctx) => {
     
     ctx.reply(`Доступные команды:\n\n${commands}`);
 });
-
-// Настройка сцен
-const stage = new Scenes.Stage([weightScene, locationScene, photoScene]);
-bot.use(session());
-bot.use(stage.middleware());
 
 // Запуск бота
 bot.launch().then(() => {
