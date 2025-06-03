@@ -39,13 +39,32 @@ router.post('/login', async (req, res) => {
         if (!match) {
             return res.render('auth/login', { error: 'Неверный пароль' });
         }
-        req.session.user = {
-            id: user.id,
-            name: user.name,
-            role: user.role
-        };
-        req.session.success = 'Вход выполнен успешно!';
-        res.redirect('/');
+        
+        // Очистка существующей сессии и создание новой при входе (защита от session fixation)
+        req.session.regenerate(function(err) {
+            if (err) {
+                console.error('Ошибка при регенерации сессии:', err);
+                return res.status(500).send('Ошибка сервера');
+            }
+            
+            // Сохранение пользовательских данных в новой сессии
+            req.session.user = {
+                id: user.id,
+                name: user.name,
+                role: user.role,
+                lastActive: Date.now() // Добавляем время последней активности
+            };
+            
+            // Сохранение сессии
+            req.session.save(function(err) {
+                if (err) {
+                    console.error('Ошибка при сохранении сессии:', err);
+                    return res.status(500).send('Ошибка сервера');
+                }
+                req.session.success = 'Вход выполнен успешно!';
+                res.redirect('/');
+            });
+        });
     } catch (err) {
         console.error('Ошибка при входе:', err);
         res.status(500).send('Ошибка сервера');
@@ -54,8 +73,17 @@ router.post('/login', async (req, res) => {
 
 // Выход
 router.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/auth/login');
+    // Безопасное удаление сессии
+    req.session.destroy(function(err) {
+        if(err) {
+            console.error('Ошибка при удалении сессии:', err);
+            return res.status(500).send('Ошибка сервера');
+        }
+        
+        // Очистка cookie сессии на стороне клиента
+        res.clearCookie('eco_session');
+        res.redirect('/auth/login');
+    });
 });
 
 // Страница регистрации

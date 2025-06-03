@@ -24,13 +24,21 @@ app.use(session({
         conObject: {
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false }
-        }
+        },
+        // Установка времени жизни сессии в хранилище (30 минут)
+        ttl: 30 * 60
     }),
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
-}));
+    name: 'eco_session', // Изменение стандартного имени cookie для усложнения идентификации
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', // В production только HTTPS
+        httpOnly: true, // Запрет доступа к cookie через JavaScript
+        sameSite: 'strict', // Защита от CSRF
+        maxAge: 30 * 60 * 1000 // 30 минут в миллисекундах
+    }
+});
 
 // Middleware для передачи flash-сообщений из сессии в шаблоны
 app.use((req, res, next) => {
