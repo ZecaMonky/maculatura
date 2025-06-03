@@ -47,6 +47,5 @@ CREATE INDEX idx_telegram_users_user_id ON "TelegramUsers"(user_id);
 -- Создание базового типа макулатуры
 INSERT INTO "PaperTypes" (name) VALUES ('Общая макулатура');
 
--- Создание администратора по умолчанию (пароль: admin123)
-INSERT INTO "Users" (name, login, password_hash, role) 
-VALUES ('Администратор', 'admin', '$2b$10$8K1p/a0dR1xqM8K3hQz1eOQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZQ', 'admin'); 
+-- Removed default admin user to enhance security
+-- An admin user should be created securely during first-time setup

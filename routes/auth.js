@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../pgdb');
+const crypto = require('crypto');
 
 // Middleware для проверки аутентификации
 const isAuthenticated = (req, res, next) => {
@@ -178,6 +179,80 @@ router.get('/userid/:login', async (req, res) => {
     } catch (error) {
         console.error('Ошибка при получении userId:', error);
         res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
+    }
+});
+
+// Страница первичной настройки (создание первого администратора)
+router.get('/setup', async (req, res) => {
+    try {
+        // Проверяем, есть ли уже администратор в системе
+        const result = await pool.query('SELECT COUNT(*) FROM "Users" WHERE role = $1', ['admin']);
+        const adminExists = parseInt(result.rows[0].count) > 0;
+        
+        if (adminExists) {
+            // Если администратор уже существует, перенаправляем на главную
+            return res.redirect('/');
+        }
+        
+        // Иначе показываем страницу настройки
+        res.render('auth/setup');
+    } catch (err) {
+        console.error('Ошибка при проверке наличия администратора:', err);
+        res.status(500).send('Ошибка сервера');
+    }
+});
+
+// Обработка создания первого администратора
+router.post('/setup', async (req, res) => {
+    try {
+        // Проверяем, есть ли уже администратор в системе
+        const checkResult = await pool.query('SELECT COUNT(*) FROM "Users" WHERE role = $1', ['admin']);
+        const adminExists = parseInt(checkResult.rows[0].count) > 0;
+        
+        if (adminExists) {
+            // Если администратор уже существует, перенаправляем на главную
+            return res.redirect('/');
+        }
+        
+        const { name, login, password, confirmPassword } = req.body;
+        
+        // Валидация логина
+        const loginError = validateLogin(login);
+        if (loginError) {
+            return res.render('auth/setup', { error: loginError });
+        }
+        
+        // Валидация пароля
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            return res.render('auth/setup', { error: passwordError });
+        }
+        
+        // Проверка совпадения паролей
+        if (password !== confirmPassword) {
+            return res.render('auth/setup', { error: 'Пароли не совпадают' });
+        }
+        
+        // Проверка существования пользователя
+        const existingUser = await pool.query('SELECT * FROM "Users" WHERE login = $1', [login]);
+        if (existingUser.rows.length > 0) {
+            return res.render('auth/setup', { error: 'Пользователь с таким логином уже существует' });
+        }
+        
+        // Хеширование пароля с увеличенным количеством раундов для админа
+        const hashedPassword = await bcrypt.hash(password, 12);
+        
+        // Создание администратора
+        await pool.query(
+            'INSERT INTO "Users" (name, login, password_hash, role) VALUES ($1, $2, $3, $4)',
+            [name, login, hashedPassword, 'admin']
+        );
+        
+        req.session.success = 'Администратор успешно создан! Теперь вы можете войти в систему.';
+        res.redirect('/auth/login');
+    } catch (error) {
+        console.error('Ошибка при создании администратора:', error);
+        res.render('auth/setup', { error: 'Произошла ошибка при создании администратора' });
     }
 });
 

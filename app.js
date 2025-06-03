@@ -54,6 +54,24 @@ const adminRoutes = require('./routes/admin');
 const profileRoutes = require('./routes/profile');
 const apiRoutes = require('./routes/api');
 
+// Проверка наличия администратора
+app.use(async (req, res, next) => {
+    try {
+        const result = await pool.query('SELECT COUNT(*) FROM "Users" WHERE role = $1', ['admin']);
+        const adminExists = parseInt(result.rows[0].count) > 0;
+        res.locals.adminExists = adminExists;
+        
+        // Перенаправление на первичную настройку, если админа нет и запрос не на /setup
+        if (!adminExists && req.path !== '/setup' && !req.path.startsWith('/auth/setup')) {
+            return res.redirect('/auth/setup');
+        }
+        next();
+    } catch (err) {
+        console.error('Ошибка при проверке наличия администратора:', err);
+        next();
+    }
+});
+
 app.use('/auth', authRoutes);
 app.use('/waste', wasteRoutes);
 app.use('/admin', adminRoutes);

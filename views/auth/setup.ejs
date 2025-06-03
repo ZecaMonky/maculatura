@@ -1,0 +1,46 @@
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mt-5">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Первичная настройка системы</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Важно!</strong> Администратор системы еще не создан. Пожалуйста, создайте первого администратора.
+                    </div>
+                    
+                    <% if (typeof error !== 'undefined' && error) { %>
+                        <div class="alert alert-danger"><%= error %></div>
+                    <% } %>
+                    
+                    <form action="/auth/setup" method="POST">
+                        <div class="form-group mb-3">
+                            <label for="name">Имя администратора</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="login">Логин администратора</label>
+                            <input type="text" class="form-control" id="login" name="login" required>
+                            <small class="form-text text-muted">Минимум 4 символа, только латинские буквы, цифры и символ подчеркивания.</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="password">Пароль</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <small class="form-text text-muted">Минимум 8 символов, должен содержать заглавные и строчные буквы, цифры и специальные символы.</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="confirmPassword">Подтвердите пароль</label>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">Создать администратора</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
