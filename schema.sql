@@ -5,6 +5,7 @@ CREATE TABLE "Users" (
     login VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'worker',
+    password_change_required BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -47,6 +48,6 @@ CREATE INDEX idx_telegram_users_user_id ON "TelegramUsers"(user_id);
 -- Создание базового типа макулатуры
 INSERT INTO "PaperTypes" (name) VALUES ('Общая макулатура');
 
--- Создание администратора по умолчанию (пароль: admin123)
-INSERT INTO "Users" (name, login, password_hash, role) 
-VALUES ('Администратор', 'admin', '$2b$10$8K1p/a0dR1xqM8K3hQz1eOQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZQ', 'admin'); 
+-- Создание администратора по умолчанию с обязательной сменой пароля при первом входе
+INSERT INTO "Users" (name, login, password_hash, role, password_change_required) 
+VALUES ('Администратор', 'admin', '$2b$10$8K1p/a0dR1xqM8K3hQz1eOQZQZQZQZQZQZQZQZQZQZQZQZQZQZQZQ', 'admin', TRUE); 

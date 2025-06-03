@@ -42,8 +42,16 @@ router.post('/login', async (req, res) => {
         req.session.user = {
             id: user.id,
             name: user.name,
-            role: user.role
+            role: user.role,
+            password_change_required: user.password_change_required
         };
+        
+        // Check if password change is required
+        if (user.password_change_required) {
+            req.session.passwordChangeRequired = true;
+            return res.redirect('/auth/change-password');
+        }
+        
         req.session.success = 'Вход выполнен успешно!';
         res.redirect('/');
     } catch (err) {
@@ -147,8 +155,8 @@ router.post('/register', async (req, res) => {
 
         // Создание нового пользователя
         await pool.query(
-            'INSERT INTO "Users" (name, login, password_hash, role) VALUES ($1, $2, $3, $4)',
-            [name, login, hashedPassword, 'worker']
+            'INSERT INTO "Users" (name, login, password_hash, role, password_change_required) VALUES ($1, $2, $3, $4, $5)',
+            [name, login, hashedPassword, 'worker', false]
         );
 
         req.session.success = 'Регистрация прошла успешно!';
@@ -178,6 +186,73 @@ router.get('/userid/:login', async (req, res) => {
     } catch (error) {
         console.error('Ошибка при получении userId:', error);
         res.status(500).json({ error: 'Ошибка сервера: ' + error.message });
+    }
+});
+
+// Middleware для проверки необходимости смены пароля
+const checkPasswordChangeRequired = (req, res, next) => {
+    if (req.session.user && req.session.user.password_change_required) {
+        next();
+    } else {
+        res.redirect('/');
+    }
+};
+
+// Страница смены пароля при первом входе
+router.get('/change-password', checkPasswordChangeRequired, (req, res) => {
+    res.render('auth/change-password', { 
+        isFirstLogin: true,
+        user: req.session.user
+    });
+});
+
+// Обработка смены пароля
+router.post('/change-password', checkPasswordChangeRequired, async (req, res) => {
+    const { newPassword, confirmPassword } = req.body;
+    const userId = req.session.user.id;
+    
+    try {
+        // Проверка совпадения паролей
+        if (newPassword !== confirmPassword) {
+            return res.render('auth/change-password', { 
+                error: 'Пароли не совпадают',
+                isFirstLogin: true,
+                user: req.session.user
+            });
+        }
+        
+        // Валидация пароля
+        const passwordError = validatePassword(newPassword);
+        if (passwordError) {
+            return res.render('auth/change-password', { 
+                error: passwordError,
+                isFirstLogin: true,
+                user: req.session.user
+            });
+        }
+        
+        // Хеширование нового пароля
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Обновление пароля и снятие флага необходимости смены пароля
+        await pool.query(
+            'UPDATE "Users" SET password_hash = $1, password_change_required = FALSE WHERE id = $2',
+            [hashedPassword, userId]
+        );
+        
+        // Обновление сессии
+        req.session.user.password_change_required = false;
+        req.session.passwordChangeRequired = false;
+        req.session.success = 'Пароль успешно изменен!';
+        
+        res.redirect('/');
+    } catch (error) {
+        console.error('Ошибка при смене пароля:', error);
+        res.render('auth/change-password', { 
+            error: 'Произошла ошибка при смене пароля',
+            isFirstLogin: true,
+            user: req.session.user
+        });
     }
 });
 
