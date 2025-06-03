@@ -161,9 +161,11 @@ router.get('/history', isAuthenticated, async (req, res) => {
             params = [req.session.user.id];
         }
         const result = await pool.query(query, params);
+        // Преобразуем weight в число
+        const records = result.rows.map(r => ({ ...r, weight: Number(r.weight) }));
         res.render('waste/history', {
             user: req.session.user,
-            records: result.rows
+            records
         });
     } catch (err) {
         res.status(500).send('Ошибка сервера');
@@ -189,9 +191,11 @@ router.get('/stats', isAuthenticated, async (req, res) => {
             params = [req.session.user.id];
         }
         const result = await pool.query(query, params);
+        // Преобразуем total_weight в число
+        const stats = result.rows.map(r => ({ ...r, total_weight: Number(r.total_weight) }));
         res.render('waste/stats', {
             user: req.session.user,
-            stats: result.rows
+            stats
         });
     } catch (err) {
         res.status(500).send('Ошибка сервера');
